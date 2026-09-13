@@ -1,0 +1,32 @@
+global:
+  resolve_timeout: 1m
+
+route:
+  receiver: 'webhook-receiver'
+  group_by: ['alertname', 'layer', 'instance']
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+  routes:
+    - matchers:
+        - severity="critical"
+      receiver: 'webhook-receiver'
+      group_wait: 5s
+      continue: false
+    - matchers:
+        - severity="warning"
+      receiver: 'webhook-receiver'
+
+inhibit_rules:
+  - source_matchers: [severity="critical"]
+    target_matchers: [severity="warning"]
+    equal: ['instance']
+  - source_matchers: [alertname="InstanceDown"]
+    target_matchers: [alertname=~"HostHigh.*"]
+    equal: ['instance']
+
+receivers:
+  - name: 'webhook-receiver'
+    webhook_configs:
+      - url: 'http://webhook-receiver:8080/webhook'
+        send_resolved: true

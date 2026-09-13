@@ -1,0 +1,68 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'order-service-swarm'
+    env: 'project4'
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['alertmanager:9093']
+
+scrape_configs:
+  # ========== 层级 1：主机层（5 个节点）==========
+  - job_name: 'node'
+    static_configs:
+      - targets: ['192.168.123.20:9100']
+        labels: {instance: 'p4-manager', layer: 'host'}
+      - targets: ['192.168.123.21:9100']
+        labels: {instance: 'p4-worker1', layer: 'host'}
+      - targets: ['192.168.123.22:9100']
+        labels: {instance: 'p4-worker2', layer: 'host'}
+      - targets: ['192.168.123.23:9100']
+        labels: {instance: 'p4-worker3', layer: 'host'}
+      - targets: ['192.168.123.24:9100']
+        labels: {instance: 'p4-worker4', layer: 'host'}
+
+  # ========== 层级 2：容器层（自建容器导出器，替代 cAdvisor）==========
+  - job_name: 'container'
+    static_configs:
+      - targets: ['192.168.123.20:8081']
+        labels: {instance: 'p4-manager', layer: 'container'}
+      - targets: ['192.168.123.21:8081']
+        labels: {instance: 'p4-worker1', layer: 'container'}
+      - targets: ['192.168.123.22:8081']
+        labels: {instance: 'p4-worker2', layer: 'container'}
+      - targets: ['192.168.123.23:8081']
+        labels: {instance: 'p4-worker3', layer: 'container'}
+      - targets: ['192.168.123.24:8081']
+        labels: {instance: 'p4-worker4', layer: 'container'}
+
+  # ========== 层级 3：中间件层 ==========
+  - job_name: 'mysql'
+    static_configs:
+      - targets: ['mysqld-exporter:9104']
+        labels: {layer: 'middleware', component: 'mysql'}
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels: {layer: 'middleware', component: 'redis'}
+
+  # ========== 层级 4：业务层（Swarm 服务发现）==========
+  - job_name: 'order-api'
+    metrics_path: /metrics
+    dns_sd_configs:
+      - names: ['tasks.order-api']
+        type: A
+        port: 8000
+
+  # ========== 监控自身 ==========
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels: {layer: 'monitor'}
